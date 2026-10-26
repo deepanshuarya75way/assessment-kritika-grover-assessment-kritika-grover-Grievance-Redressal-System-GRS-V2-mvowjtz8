@@ -26,8 +26,8 @@ const AdminDashboard = () => {
     const [assignEmailDraft, setAssignEmailDraft] = useState('');
     const [savingAssign, setSavingAssign] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
-    const f= useGrievanceList('/complaint/get-all',true);
-    const {complaints, setComplaints, loading,summary}=f;
+    const f = useGrievanceList('/complaint/get-all', true);
+    const { complaints, setComplaints, loading, summary } = f;
     const statusLabel = (s) => (
         s === 'closed' ? 'Closed' : s === 'pending' ? 'Pending' : 'Not Processed'
     );
@@ -51,10 +51,10 @@ const AdminDashboard = () => {
         setManualAssignMode(false);
     }, [selectedComplaint?._id]);
 
-useEffect(()=>{
-    api.get('/student/all').then((r)=> setStudents(r.data));
-     api.get('/staff/all').then((r)=> setStaffList(r.data));
-},[]);
+    useEffect(() => {
+        api.get('/student/all').then((r) => setStudents(r.data));
+        api.get('/staff/all').then((r) => setStaffList(r.data));
+    }, []);
 
     // Supports links from assignment notification emails
     // (?complaintId=...) by opening that complaint once it's loaded.
@@ -62,15 +62,14 @@ useEffect(()=>{
         const id = searchParams.get('complaintId');
         if (!id) return;
         const next = new URLSearchParams(searchParams);
-        
         next.delete('complaintId');
         setSearchParams(next, { replace: true });
-        api.get('/complaint/details/${id}').then((r)=> setSelectedComplaint(r.data));
-    }, [SearchParams]);
+        api.get(`/complaint/details/${id}`).then((r) => setSelectedComplaint(r.data));
+    }, [searchParams, setSearchParams]);
 
     const updateStatus = async (id, newStatus, note) => {
         try {
-            const res = await api.put('/complaint/update-status/${id}', { status: newStatus, note });
+            const res = await api.put(`/complaint/update-status/${id}`, { status: newStatus, note });
             const updated = res.data.complaint;
             setComplaints(prev => prev.map(c => c._id === id ? updated : c));
             setSelectedComplaint(prev => (prev && prev._id === id) ? updated : prev);
@@ -144,6 +143,7 @@ useEffect(()=>{
             setSendingMessage(false);
         }
     };
+
     return (
         <div className="container animate-fade">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -176,11 +176,9 @@ useEffect(()=>{
                     </div>
                     <div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500', marginBottom: '0.25rem' }}>Action Needed</p>
-                        <h3 style={{ fontSize: '1.75rem' }}>{summary.pending +summary.notProessed}</h3>
+                        <h3 style={{ fontSize: '1.75rem' }}>{summary.pending + summary.notProcessed}</h3>
                     </div>
                 </div>
-
-               
 
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.5rem' }}>
                     <div style={{ background: 'var(--primary)', color: 'white', padding: '1rem', borderRadius: '12px' }}>
@@ -195,24 +193,24 @@ useEffect(()=>{
 
             {/* All Complaints Table */}
             <div className="card" style={{ padding: '0' }}>
-               <div style={{padding:'1.5rem', borderBottom:'1px solid var(-border)'}}>
-                <h3 style ={{ fontSize:'1.25rem', margin:0}}>All Grievances ({f.pagination.total})</h3>
+               <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>
+                <h3 style={{ fontSize: '1.25rem', margin: 0 }}>All Grievances ({f.pagination.total})</h3>
                 </div>
 
                 <GrievanceFilters f={f} />
 
                 <div style={{ overflowX: 'auto' }}>
-                   {loading && complaints.length === 0?(
-                    <div style ={{padding:'2rem',textAlign:'center'}}>Loading system data </div>
-                    ) : f.pagination.total===0?(
-                        <GrievanceEmpty f= {f}/>
+                   {loading && complaints.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center' }}>Loading system data</div>
+                    ) : f.pagination.total === 0 ? (
+                        <GrievanceEmpty f={f} />
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ background: 'var(--background)' }}>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Student / ID</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Type</th>
-                                    <th style={{ p9adding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Description</th>
+                                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Description</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Assigned To</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Date</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Current Status</th>
@@ -220,7 +218,7 @@ useEffect(()=>{
                                 </tr>
                             </thead>
                             <tbody>
-                                {Complaints.map((c) => (
+                                {complaints.map((c) => (
                                     <tr key={c._id} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '1rem 1.5rem' }}>
                                             <div style={{ fontWeight: '500' }}>{c.studentId?.name || 'Unknown'}</div>
@@ -317,7 +315,7 @@ useEffect(()=>{
                         </table>
                     )}
                 </div>
-                <GrievancePager f= {f} />
+                <GrievancePager f={f} />
             </div>
 
             {/* Complaint Details Modal */}
@@ -471,7 +469,7 @@ useEffect(()=>{
                             )}
                         </div>
 
-                        {/* Full description — no more truncation */}
+                        {/* Full description */}
                         <div>
                             <div className="form-label" style={{ marginBottom: '0.5rem' }}>Full Description</div>
                             <div style={{
@@ -503,136 +501,12 @@ useEffect(()=>{
                             </div>
                         )}
 
-                        {/* Two-way conversation with the student */}
-                        <div>
-                            <div className="form-label" style={{ marginBottom: '0.5rem' }}>Conversation with Student</div>
-                            <MessageThread
-                                messages={selectedComplaint.messages || []}
-                                currentRole="admin"
-                                onSend={sendMessage}
-                                sending={sendingMessage}
-                            />
-                        </div>
-
-                        {/* Activity & Audit Trail */}
-                        <div>
-                            <div className="form-label" style={{ marginBottom: '0.5rem' }}>Activity &amp; Notes</div>
-                            <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.85rem',
-                                maxHeight: '220px',
-                                overflowY: 'auto',
-                                paddingRight: '4px',
-                                marginBottom: '1rem'
-                            }}>
-                                {(!selectedComplaint.notes || selectedComplaint.notes.length === 0) ? (
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                                        No activity yet — status changes and notes will show up here.
-                                    </p>
-                                ) : (
-                                    [...selectedComplaint.notes]
-                                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                                        .map((n) => (
-                                            <div key={n._id} style={{ display: 'flex', gap: '0.75rem' }}>
-                                                <div style={{
-                                                    width: '28px', height: '28px', borderRadius: '50%',
-                                                    background: 'var(--neutral-bg)', color: 'var(--primary)',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    flexShrink: 0, fontSize: '0.75rem'
-                                                }}>
-                                                    {n.type === 'status_change' ? <FaExchangeAlt /> : n.type === 'assignment' ? <FaUserTag /> : <FaStickyNote />}
-                                                </div>
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                            {n.type === 'status_change' && (
-                                                                <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                                                                    Status changed {n.fromStatus ? `from ${statusLabel(n.fromStatus)} ` : ''}
-                                                                    to {statusLabel(n.toStatus)}
-                                                                </div>
-                                                            )}
-                                                            {n.type === 'assignment' && (
-                                                                <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                                                                    {n.toAssignee
-                                                                        ? (n.fromAssignee ? `Reassigned from ${n.fromAssignee} to ${n.toAssignee}` : `Assigned to ${n.toAssignee}`)
-                                                                        : `Unassigned${n.fromAssignee ? ` (was ${n.fromAssignee})` : ''}`}
-                                                                    {n.toAssigneeEmail && (
-                                                                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> — notified {n.toAssigneeEmail}</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            {n.text && (
-                                                                <div style={{
-                                                                    fontSize: '0.85rem',
-                                                                    color: 'var(--text-main)',
-                                                                    marginTop: n.type === 'status_change' ? '0.25rem' : 0,
-                                                                    wordBreak: 'break-word'
-                                                                }}>
-                                                                    {n.text}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        {n.type === 'note' && (
-                                                            <button
-                                                                onClick={() => deleteNote(selectedComplaint._id, n._id)}
-                                                                title="Delete note"
-                                                                style={{
-                                                                    background: 'transparent',
-                                                                    border: 'none',
-                                                                    color: 'var(--text-muted)',
-                                                                    cursor: 'pointer',
-                                                                    padding: '2px',
-                                                                    flexShrink: 0,
-                                                                    display: 'flex'
-                                                                }}
-                                                            >
-                                                                <FaTrash size={12} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                                                        {n.addedByEmail || 'Admin'} • {new Date(n.createdAt).toLocaleString()}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                )}
-                            </div>
-
-                            <textarea
-                                className="form-control"
-                                rows={2}
-                                placeholder="e.g. Contacted the student, awaiting their response..."
-                                value={noteDraft}
-                                onChange={(e) => setNoteDraft(e.target.value)}
-                                style={{ resize: 'vertical', marginBottom: '0.75rem' }}
-                            />
-
-                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                <button
-                                    className="btn btn-outline"
-                                    disabled={!noteDraft.trim() || savingNote}
-                                    onClick={() => addNote(selectedComplaint._id)}
-                                    style={{ flex: '1 1 160px' }}
-                                >
-                                    {savingNote ? 'Saving...' : <><FaStickyNote style={{ marginRight: '6px' }} /> Save Note</>}
-                                </button>
-                                <select
-                                    className="form-control"
-                                    value={selectedComplaint.status}
-                                    onChange={(e) => updateStatus(selectedComplaint._id, e.target.value, noteDraft)}
-                                    style={{ flex: '1 1 160px' }}
-                                >
-                                    <option value="notProcessed">Not Processed</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="closed">Closed</option>
-                                </select>
-                            </div>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', marginBottom: 0 }}>
-                                Changing the status above will also save whatever note you've typed in.
-                            </p>
-                        </div>
+                        {/* Message Thread */}
+                        <MessageThread 
+                            messages={selectedComplaint.messages || []}
+                            onSendMessage={sendMessage}
+                            sending={sendingMessage}
+                        />
                     </div>
                 )}
             </Modal>
