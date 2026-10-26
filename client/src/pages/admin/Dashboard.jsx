@@ -54,7 +54,7 @@ const AdminDashboard = () => {
 useEffect(()=>{
     api.get('/student/all').then((r)=> setStudents(r.data));
      api.get('/staff/all').then((r)=> setStaffList(r.data));
-});
+},[]);
 
     // Supports links from assignment notification emails
     // (?complaintId=...) by opening that complaint once it's loaded.
@@ -70,7 +70,7 @@ useEffect(()=>{
 
     const updateStatus = async (id, newStatus, note) => {
         try {
-            const res = await api.put(`/complaint/update-status/${id}`, { status: newStatus, note });
+            const res = await api.put('/complaint/update-status/${id}', { status: newStatus, note });
             const updated = res.data.complaint;
             setComplaints(prev => prev.map(c => c._id === id ? updated : c));
             setSelectedComplaint(prev => (prev && prev._id === id) ? updated : prev);

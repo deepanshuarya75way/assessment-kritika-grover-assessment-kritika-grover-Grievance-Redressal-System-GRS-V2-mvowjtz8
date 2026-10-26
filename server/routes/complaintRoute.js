@@ -55,7 +55,7 @@ const canActOnComplaint = (req, complaint) => {
 
     const split= (v)=>( v? String(v).split(',').filter(Boolean):[])
      
-    const sendPage= async (req,res)=>{
+    const sendPage= async (req,res, base= {})=>{
         const page=Math.max(parseInt(req.query.page)|| 1,1)
         const limit= 10
         const filter= { ...base }

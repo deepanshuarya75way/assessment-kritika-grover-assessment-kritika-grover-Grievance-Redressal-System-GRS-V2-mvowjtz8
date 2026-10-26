@@ -56,12 +56,30 @@ const applyPreset= (p)=>{
  Object.entries(p.filters).forEach(([k,v])=>{if(v) next.set(k,v);})
   setSp(next,{replace:true});
 };
-const deletePreset= async (p)=> {
-  await api.delete('/filter-presets/${p._id');
-  setPresets((x)=> x.filter((y)=> y._id) !== p._id);
+const deletePreset= async (p)=>{
+  await api.delete('/filter-presets/${p._id}');
+  setPresets((x)=> x.filter((y)=> y._id !==p._id));
 };
 return { 
-  complaints, setComplaints,pagination, summary, loadSummary, loading, deptOptions, presetsq, dept, urgency, hasFilters, setParams, toggle, reset, savePreset,applyPreset, deletePreset }
+  complaints, 
+  setComplaints,
+  pagination, 
+  summary, 
+  loadSummary, 
+  loading, 
+  deptOptions, 
+  presets, 
+  dept, 
+  urgency, 
+  hasFilters, 
+  setParams, 
+  toggle, 
+  reset, 
+  savePreset,
+  applyPreset, 
+  deletePreset 
+};
+
   
 const B= ({ on,...p})=> <button className={on ? 'btn btn-primary': 'btn btn-outline'} {...p}/>;
 export const GrievanceFilters = ({f}) =>(
@@ -69,11 +87,11 @@ export const GrievanceFilters = ({f}) =>(
     <input className="form-control" placeholder= "Search..." value={f.q}
     onChange={(e)=> f.setParams({ q: e.target.value})}/>
     {['Low','Medium','High', 'Emergency'].map((u) => (
-      <B key = {u} on = {f.urgency.includes(u)} onClick= {()=> f.toggle('urgency',f.dept, d._id)}>{d.name}</B>
+      <B key = {u} on = {f.urgency.includes(u)} onClick= {()=> f.toggle('urgency',f.urgency,u)}>{u}</B>
     ))}
     <br/>
     {f.deptOptions.map((d)=>(
-      <B key={d._id} on= {f.dept.includes(d._id)}onClick={()=> f.togggle('dept',f.dept,d._id)}>{d.name}</B>
+      <B key={d._id} on= {f.dept.includes(d._id)}onClick={()=> f.toggle('dept',f.dept,d._id)}>{d.name}</B>
     ))}
     <br/>
     {f.presets.map((p)=>(
