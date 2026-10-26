@@ -1,3 +1,4 @@
+import {useGrievanceList, GrievanceFilters,GrievancePager,GrievanceEmpty} from '../../components/GrievanceFilters';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
@@ -11,13 +12,11 @@ import { isEscalated, getStatusSince, getDaysSince, ESCALATION_DAYS } from '../.
 const AdminDashboard = () => {
     const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [complaints, setComplaints] = useState([]);
+   
     const [students, setStudents] = useState([]);
     const [staffList, setStaffList] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({ totalCom: 0, pending: 0, closed: 0, notProcessed: 0, totalStu: 0 });
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+   
+  
     const [selectedComplaint, setSelectedComplaint] = useState(null);
     const [noteDraft, setNoteDraft] = useState('');
     const [savingNote, setSavingNote] = useState(false);
@@ -27,8 +26,8 @@ const AdminDashboard = () => {
     const [assignEmailDraft, setAssignEmailDraft] = useState('');
     const [savingAssign, setSavingAssign] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
-    const [escalatedOnly, setEscalatedOnly] = useState(false);
-
+    const f= useGrievanceList('/complaint/get-all',true);
+    const {complaints, setComplaints, loading,summary}=f;
     const statusLabel = (s) => (
         s === 'closed' ? 'Closed' : s === 'pending' ? 'Pending' : 'Not Processed'
     );
@@ -52,44 +51,22 @@ const AdminDashboard = () => {
         setManualAssignMode(false);
     }, [selectedComplaint?._id]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [compRes, stuRes, staffRes] = await Promise.all([
-                    api.get('/complaint/get-all'),
-                    api.get('/student/all'),
-                    api.get('/staff/get-all')
-                ]);
-                
-                setComplaints(compRes.data);
-                setStudents(stuRes.data);
-                setStaffList(staffRes.data);
-                
-                const s = { totalCom: compRes.data.length, pending: 0, closed: 0, notProcessed: 0, totalStu: stuRes.data.length };
-                compRes.data.forEach(c => s[c.status]++);
-                setStats(s);
-            } catch (err) {
-                console.error("Failed to fetch admin data", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+useEffect(()=>{
+    api.get('/student/all').then((r)=> setStudents(r.data));
+     api.get('/staff/all').then((r)=> setStaffList(r.data));
+});
 
     // Supports links from assignment notification emails
     // (?complaintId=...) by opening that complaint once it's loaded.
     useEffect(() => {
-        const targetId = searchParams.get('complaintId');
-        if (!targetId || complaints.length === 0) return;
-        const match = complaints.find(c => c._id === targetId);
-        if (match) {
-            setSelectedComplaint(match);
-        }
+        const id = searchParams.get('complaintId');
+        if (!id) return;
         const next = new URLSearchParams(searchParams);
+        
         next.delete('complaintId');
         setSearchParams(next, { replace: true });
-    }, [complaints, searchParams, setSearchParams]);
+        api.get('/complaint/details/${id}').then((r)=> setSelectedComplaint(r.data));
+    }, [SearchParams]);
 
     const updateStatus = async (id, newStatus, note) => {
         try {
@@ -98,6 +75,7 @@ const AdminDashboard = () => {
             setComplaints(prev => prev.map(c => c._id === id ? updated : c));
             setSelectedComplaint(prev => (prev && prev._id === id) ? updated : prev);
             setNoteDraft('');
+            f.loadSummary();
         } catch (err) {
             alert('Failed to update status');
         }
@@ -166,29 +144,6 @@ const AdminDashboard = () => {
             setSendingMessage(false);
         }
     };
-
-    const filteredComplaints = useMemo(() => {
-        const term = searchTerm.trim().toLowerCase();
-        return complaints.filter((c) => {
-            const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-            if (!matchesStatus) return false;
-            if (escalatedOnly && !isEscalated(c)) return false;
-            if (!term) return true;
-            return (
-                c.studentId?.name?.toLowerCase().includes(term) ||
-                c.studentId?.email?.toLowerCase().includes(term) ||
-                c.complaintType?.name?.toLowerCase().includes(term) ||
-                c.complaint?.toLowerCase().includes(term) ||
-                c.assignedTo?.toLowerCase().includes(term)
-            );
-        });
-    }, [complaints, searchTerm, statusFilter, escalatedOnly]);
-
-    const escalatedCount = useMemo(
-        () => complaints.filter(isEscalated).length,
-        [complaints]
-    );
-
     return (
         <div className="container animate-fade">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -211,7 +166,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500', marginBottom: '0.25rem' }}>Total Grievances</p>
-                        <h3 style={{ fontSize: '1.75rem' }}>{stats.totalCom}</h3>
+                        <h3 style={{ fontSize: '1.75rem' }}>{summary.total}</h3>
                     </div>
                 </div>
                 
@@ -221,28 +176,11 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500', marginBottom: '0.25rem' }}>Action Needed</p>
-                        <h3 style={{ fontSize: '1.75rem' }}>{stats.pending + stats.notProcessed}</h3>
+                        <h3 style={{ fontSize: '1.75rem' }}>{summary.pending +summary.notProessed}</h3>
                     </div>
                 </div>
 
-                <button
-                    onClick={() => setEscalatedOnly((v) => !v)}
-                    className="card"
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.5rem',
-                        cursor: 'pointer', border: escalatedOnly ? '2px solid var(--error)' : '1px solid var(--border)',
-                        textAlign: 'left', font: 'inherit'
-                    }}
-                    title={`Complaints pending more than ${ESCALATION_DAYS} days — click to filter the table`}
-                >
-                    <div style={{ background: 'var(--error)', color: 'white', padding: '1rem', borderRadius: '12px' }}>
-                        <FaFireAlt size={24} />
-                    </div>
-                    <div>
-                        <p style={{ color: 'var(--text-muted)', fontWeight: '500', marginBottom: '0.25rem' }}>Escalated</p>
-                        <h3 style={{ fontSize: '1.75rem' }}>{escalatedCount}</h3>
-                    </div>
-                </button>
+               
 
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1.5rem' }}>
                     <div style={{ background: 'var(--primary)', color: 'white', padding: '1rem', borderRadius: '12px' }}>
@@ -250,79 +188,31 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                         <p style={{ color: 'var(--text-muted)', fontWeight: '500', marginBottom: '0.25rem' }}>Registered Students</p>
-                        <h3 style={{ fontSize: '1.75rem' }}>{stats.totalStu}</h3>
+                        <h3 style={{ fontSize: '1.75rem' }}>{students.length}</h3>
                     </div>
                 </div>
             </div>
 
             {/* All Complaints Table */}
             <div className="card" style={{ padding: '0' }}>
-                <div style={{
-                    padding: '1.5rem',
-                    borderBottom: '1px solid var(--border)',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '1rem',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
-                    <h3 style={{ fontSize: '1.25rem', margin: 0 }}>All Grievances</h3>
-
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div style={{ position: 'relative' }}>
-                            <FaSearch style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.85rem' }} />
-                            <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Search student, type, or text..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ paddingLeft: '2.25rem', minWidth: '240px', fontSize: '0.875rem' }}
-                            />
-                        </div>
-                        <select
-                            className="form-control"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            style={{ width: 'auto', fontSize: '0.875rem' }}
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="notProcessed">Not Processed</option>
-                            <option value="pending">Pending</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                        <label style={{
-                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                            fontSize: '0.875rem', color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap'
-                        }}>
-                            <input
-                                type="checkbox"
-                                checked={escalatedOnly}
-                                onChange={(e) => setEscalatedOnly(e.target.checked)}
-                            />
-                            Escalated only
-                        </label>
-                    </div>
+               <div style={{padding:'1.5rem', borderBottom:'1px solid var(-border)'}}>
+                <h3 style ={{ fontSize:'1.25rem', margin:0}}>All Grievances ({f.pagination.total})</h3>
                 </div>
 
+                <GrievanceFilters f={f} />
+
                 <div style={{ overflowX: 'auto' }}>
-                    {loading ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading system data...</div>
-                    ) : complaints.length === 0 ? (
-                        <div style={{ padding: '3rem', textAlign: 'center' }}>
-                            <h4 style={{ color: 'var(--text-muted)' }}>No grievances found in system.</h4>
-                        </div>
-                    ) : filteredComplaints.length === 0 ? (
-                        <div style={{ padding: '3rem', textAlign: 'center' }}>
-                            <h4 style={{ color: 'var(--text-muted)' }}>No grievances match your search/filter.</h4>
-                        </div>
+                   {loading && complaints.length === 0?(
+                    <div style ={{padding:'2rem',textAlign:'center'}}>Loading system data </div>
+                    ) : f.pagination.total===0?(
+                        <GrievanceEmpty f= {f}/>
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ background: 'var(--background)' }}>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Student / ID</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Type</th>
-                                    <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Description</th>
+                                    <th style={{ p9adding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Description</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Assigned To</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Date</th>
                                     <th style={{ padding: '1rem 1.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>Current Status</th>
@@ -330,7 +220,7 @@ const AdminDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredComplaints.map((c) => (
+                                {Complaints.map((c) => (
                                     <tr key={c._id} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '1rem 1.5rem' }}>
                                             <div style={{ fontWeight: '500' }}>{c.studentId?.name || 'Unknown'}</div>
@@ -427,6 +317,7 @@ const AdminDashboard = () => {
                         </table>
                     )}
                 </div>
+                <GrievancePager f= {f} />
             </div>
 
             {/* Complaint Details Modal */}

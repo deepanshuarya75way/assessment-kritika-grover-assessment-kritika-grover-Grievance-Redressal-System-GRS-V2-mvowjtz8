@@ -8,7 +8,7 @@ const authMiddleware = require('../middleware/authMiddleware')
 const { requireRole } = require('../middleware/authMiddleware')
 const { upload, toAttachment } = require('../middleware/upload')
 const { sendAssignmentEmail } = require('../utils/mailer')
-
+const mongoose = require('mongoose')
 // Loose but sane email validation — good enough to catch typos before we
 // try to send to it. Not meant to be a full RFC 5322 validator.
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -53,11 +53,71 @@ const canActOnComplaint = (req, complaint) => {
     return false
 }
 
+    const split= (v)=>( v? String(v).split(',').filter(Boolean):[])
+     
+    const sendPage= async (req,res)=>{
+        const page=Math.max(parseInt(req.query.page)|| 1,1)
+        const limit= 10
+        const filter= { ...base }
+        const and = []
+
+        if (['notProcessed','pending','closed'].includes(req.query.status)){
+            filter.status= req.query.status
+        }
+
+        const depts= split(req.query.departments).filter(id => mongoose.Types.ObjectId.isValid(id))
+        if (depts.length) filter.complaintType= {$in:depts}
+
+        const urg = split(req.query.urgency)
+        if(urg.length){
+            const options= [{urgency: { $in:urg}}]
+            if (urg.includes('Medium')) options.push({ urgency :{ $exists: false}})
+                and.push({ $or: options})
+        }
+
+        const range= {}
+        if (req.query.from) range.$gte= new Date(req.query.from + 'T00:00:00.000Z')
+            if(req.query.to) range.$lte= new Date(req.query.to + 'T23:59:59:999Z')
+                if(Object.keys(range).length) filter.createdAt= range
+
+        const q= String(req.query.q || ``).trim()
+        if (q){
+                const rx= new RegExp(q.replace(/[.*+?^${}()|[\][\\]/g,'\\$&'),'i')
+                const students= await Student.find({ $or:[{name:rx}, {email:rx}]}).select('_id')
+                and.push({ $or:[
+                    {complaint:rx},
+                    {assignedTo:rx},
+                    {studentId: {$in: students.map(s=>s._id)}}
+
+                ]})
+        }
+        if (and.length) filter.$and = and
+
+        const total = await Complaint.countDocuments(filter)
+        const totalPages= Math.max(Math.ceil(total/limit),1)
+        const safePage= Math.min(page, totalPages)
+        const complaints= await Complaint.find(filter)
+        .populate({
+            path: 'studentId',
+            select: 'name email mobile collegeId course',
+            populate: {path:'collegeId', select:'name'}
+
+        })
+        .populate('complaintType', 'name')
+        .sort({createdAt: -1, _id:-1})
+        .skip((safePage-1)*limit)
+        .limit(limit)
+        res.status(200).json({complaints,pagination:{page:safePage, limit, total, totalPages}})
+    }
+
+
+
+
 // Create a new complaint (Student) — accepts up to 3 attachments
 // (photos, screenshots, PDFs) under the 'attachments' field.
 router.post('/create', authMiddleware, upload.array('attachments', 3), async (req, res) => {
     try {
-        const { complaintType, complaint } = req.body
+        const { complaintType, complaint, urgency } = req.body
         const studentId = req.user.id // From authMiddleware
 
         const attachments = (req.files || []).map(toAttachment)
@@ -66,6 +126,7 @@ router.post('/create', authMiddleware, upload.array('attachments', 3), async (re
             complaintType,
             complaint,
             studentId,
+            urgency:['Low','Medium','High','Emergency'].includes(urgency) ? urgency:'Medium',
             attachments
         })
 
@@ -97,19 +158,11 @@ router.get('/student-complaints', authMiddleware, async (req, res) => {
 // Get all complaints (Admin only — staff use /assigned-to-me instead,
 // since they should only ever see complaints routed to them).
 router.get('/get-all', authMiddleware, requireRole('admin'), async (req, res) => {
-    try {
-        const complaints = await Complaint.find()
-            .populate({
-                path: 'studentId',
-                select: 'name email mobile collegeId course',
-                populate: { path: 'collegeId', select: 'name' }
-            })
-            .populate('complaintType', 'name')
-            .sort({ createdAt: -1 })
-        res.status(200).json(complaints)
-    } catch (error) {
+    try{
+        await sendPage(req,res,{})
+    }catch (error){
         console.error(error)
-        res.status(500).json({ message: 'Internal server error' })
+        res.status(500).json({ messgae:'Internal Server error'})
     }
 })
 
@@ -117,21 +170,54 @@ router.get('/get-all', authMiddleware, requireRole('admin'), async (req, res) =>
 // This is the entire visibility boundary for staff — they never see
 // anything outside this list.
 router.get('/assigned-to-me', authMiddleware, requireRole('staff'), async (req, res) => {
-    try {
-        const complaints = await Complaint.find({ assignedStaffId: req.user.id })
-            .populate({
-                path: 'studentId',
-                select: 'name email mobile collegeId course',
-                populate: { path: 'collegeId', select: 'name' }
-            })
-            .populate('complaintType', 'name')
-            .sort({ createdAt: -1 })
-        res.status(200).json(complaints)
-    } catch (error) {
+   try{
+    await sendPage(req, res, { assignedStaffId: req.user.id})
+   } catch(error){
+    conole.error(error)
+    res.status(500).json({message:'Internal Server error'})
+   }
+})
+
+
+router.get('/summary', authMiddleware, requireRole('admin','staff'), async (req, res) => {
+    try{
+        const base = req.user.role === 'staff'?{assignedStaffId:req.user.id}:{}
+        const [total, notProcessed, pending, closed]= await Promise.all([
+            Complaint.countDocuments(base),
+            Complaint.countDocuments({...base, status:'notProcessed'}),
+             Complaint.countDocuments({...base, status:'pending'}),
+              Complaint.countDocuments({...base, status:'closed'})
+        ])
+        res.status(200).json({total, notProcessed, pending, closed})
+    } catch(error){
         console.error(error)
-        res.status(500).json({ message: 'Internal server error' })
+        res.status(500).json({message: 'Internal Server error'})
     }
 })
+
+router.get('/details/:id', authMiddleware, requireRole('admin','staff'), async(req,res)=>{
+    try{
+        const complaint= await Complaint.findById(req.params.id)
+        .populate({
+            path:'studentId',
+            select:'name email mobile collegeId course',
+            populate:{path:'collegeId', select:'name'}
+        })
+        .populate('complaintType','name')
+        if(!complaint) return res.status(404).json ({message:'Complaint not found'})
+            if (!canActOnComplaint(req, complaint)){
+                return res.status(403).json({message:'not assisgned to you'})
+    }
+    res.status(200).json(complaint)
+} catch (error)
+{
+    console.error(error)
+    res.status(500).json({
+        message:'Internal server error'
+    })
+}
+})
+
 
 // Update complaint status (Admin, or Staff on a complaint assigned to
 // them) — also logs an audit trail entry, optionally with a note

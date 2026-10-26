@@ -10,7 +10,8 @@ const RaiseComplaint = () => {
     const [complaintTypes, setComplaintTypes] = useState([]);
     const [formData, setFormData] = useState({
         complaintType: '',
-        complaint: ''
+        complaint: '',
+        urgency:'Medium'
     });
     const [files, setFiles] = useState([]);
     const [error, setError] = useState('');
@@ -67,6 +68,7 @@ const RaiseComplaint = () => {
             const payload = new FormData();
             payload.append('complaintType', formData.complaintType);
             payload.append('complaint', formData.complaint);
+            payload.append('urgency', formData.urgency);
             files.forEach((f) => payload.append('attachments', f));
 
             await api.post('/complaint/create', payload);
@@ -132,6 +134,16 @@ const RaiseComplaint = () => {
                             ></textarea>
                         </div>
                     </div>
+
+                    <div className= 'form-group' style={{ marginBottom:'2rem'}}>
+                        <label className='form-label'> Urgency</label>
+                        <select name="urgency" className="form-control" value= {formData.urgency} onChange= {handleChange}>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Emergency">Emergency</option>
+                        </select>
+                    </div>        
 
                     <div className="form-group" style={{ marginBottom: '2rem' }}>
                         <label className="form-label" style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-main)' }}>Attachments (optional)</label>

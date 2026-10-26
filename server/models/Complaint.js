@@ -84,6 +84,11 @@ const complaintSchema  = mongoose.Schema({
         enum:['notProcessed','pending','closed'],
         default:'notProcessed'
     },
+    urgency:{
+        type:String,
+        enum:['Low','Medium','High','Emergency'],
+        default:'Medium'
+    },
     // Free-text label for who's responsible for resolving this — e.g.
     // "Hostel Warden - Mr. Sharma". Kept as a fallback/display copy even
     // when assignedStaffId is set (auto-filled from the staff record),

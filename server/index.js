@@ -37,7 +37,7 @@ app.use("/api/session", require("./routes/sessionRoute"));
 app.use("/api/complaintType", require("./routes/complaintTypeRoute"));
 app.use("/api/staff", require("./routes/staffRoute"));
 app.use("/api/complaint", require("./routes/complaintRoute"));
-
+app.use("/api/filter-presets", require("./routes/filterPresetRoute"));
 // Error handling
 app.use((err, req, res, next) => {
   if (err) {
