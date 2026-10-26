@@ -46,7 +46,13 @@ export const useGrievanceList = (endpoint, withDepts) => {
 
   useEffect(() => {
     setLoading(true);
-    api.get(endpoint, { params: { page, q, departments: dept.join(','), urgency: urgency.join(',') } })
+    api.get(endpoint, {
+       params: {
+         page, 
+         q, 
+         departments: dept.join(','), 
+         urgency: urgency.join(',') } 
+        })
       .then((r) => { 
         setComplaints(r.data.complaints); 
         setPagination(r.data.pagination); 
